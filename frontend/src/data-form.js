@@ -9,9 +9,10 @@ import axios from 'axios';
 const endpointMapping = {
     'Notion': 'notion',
     'Airtable': 'airtable',
+    'HubSpot': 'hubspot',
 };
 
-export const DataForm = ({ integrationType, credentials }) => {
+export const DataForm = ({ integrationType, credentials, setIntegrationParams }) => {
     const [loadedData, setLoadedData] = useState(null);
     const endpoint = endpointMapping[integrationType];
 
@@ -20,10 +21,20 @@ export const DataForm = ({ integrationType, credentials }) => {
             const formData = new FormData();
             formData.append('credentials', JSON.stringify(credentials));
             const response = await axios.post(`http://localhost:8000/integrations/${endpoint}/load`, formData);
-            const data = response.data;
-            setLoadedData(data);
+            let responseData = response.data;
+            if (integrationType === 'HubSpot') {
+                if (responseData.new_credentials && setIntegrationParams) {
+                    console.log("Token refreshed. Updating frontend state...");
+                    setIntegrationParams(prev => ({
+                        ...prev,
+                        credentials: JSON.parse(responseData.new_credentials)
+                    }));
+                }
+                responseData = responseData.data;
+            }
+            setLoadedData(JSON.stringify(responseData, null, 2));
         } catch (e) {
-            alert(e?.response?.data?.detail);
+            alert(e?.response?.data?.detail || "Error loading data");
         }
     }
 
@@ -33,20 +44,22 @@ export const DataForm = ({ integrationType, credentials }) => {
                 <TextField
                     label="Loaded Data"
                     value={loadedData || ''}
-                    sx={{mt: 2}}
+                    sx={{ mt: 2 }}
                     InputLabelProps={{ shrink: true }}
+                    multiline
+                    rows={10}
                     disabled
                 />
                 <Button
                     onClick={handleLoad}
-                    sx={{mt: 2}}
+                    sx={{ mt: 2 }}
                     variant='contained'
                 >
                     Load Data
                 </Button>
                 <Button
                     onClick={() => setLoadedData(null)}
-                    sx={{mt: 1}}
+                    sx={{ mt: 1 }}
                     variant='contained'
                 >
                     Clear Data
